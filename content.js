@@ -47,8 +47,10 @@ let questions = [];
 let questionIndex = 0;
 let score = 0;
 let shadow = null; // Shadow root reference
+window.bbCurrentPrice = 0; // Global tracker
 
 function startIntervention(price) {
+    window.bbCurrentPrice = price;
     // 1. Get Questions from background
     chrome.runtime.sendMessage({ type: 'GET_QUESTIONS', price }, (response) => {
         questions = response.questions;
@@ -271,13 +273,39 @@ function renderResult(container) {
     </div>
   `;
 
-    shadow.getElementById('btn-save').onclick = () => {
+    shadow.getElementById('btn-save').onclick = async () => {
         // Save logic
         // We don't have the item price easily available here unless tracked globally.
-        // For now, save 0 or use the last known price passed to renderQuestion (if we tracked it).
-        // Let's just alert for now.
-        alert("Great choice! You saved money.");
-        document.getElementById('boiler-budget-host').remove();
+        // However, we rely on the implementation of `storage.addSavings`.
+        // We need to pass the price or retrieve it. 
+        // `renderQuestion` was called with `price`, but we are deep in `renderResult`.
+        // Let's rely on a global `currentPrice` variable or similar approach?
+        // Actually, `renderQuestion` received `price`, but we didn't persist it. 
+        // Let's assume for now we grab it from the DOM text if needed, OR better:
+        // We pass `price` through the `renderResult` chain.
+
+        // For now, let's use a heuristic: if `price` variable is available in scope (it is not directly here).
+        // Let's fix this by adding `currentPrice` global.
+        const savedAmount = window.bbCurrentPrice || 0; // Fallback
+
+        // Call background to add savings (which now handles points/streaks)
+        // We need to convert `addSavings` to message passing because content script 
+        // cannot access `storage.js` directly if it's an ES module that uses `chrome.storage`?
+        // Actually `storage.js` uses `chrome.storage.local` which IS available in content scripts.
+        // BUT we imported `getQuestionsForPrice` in background, not `storage` methods?
+        // Wait, we need to import `storage` in content.js? 
+        // Or send message to background to handle the write.
+        // Messaging is safer for logic centralization.
+
+        chrome.runtime.sendMessage({ type: 'ADD_SAVINGS', amount: savedAmount }, (response) => {
+            if (response) {
+                // Show Feedback
+                const { pointsEarned, newStreak, unlocked } = response;
+                alert(`🎉 SAVED! \n\n+${pointsEarned} Points 🪙\nStreak: ${newStreak} 🔥`);
+                // Removing host
+                document.getElementById('boiler-budget-host').remove();
+            }
+        });
     };
 
     shadow.getElementById('btn-buy').onclick = () => {

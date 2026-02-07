@@ -5,9 +5,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const totalSaved = await storage.getTotalSaved();
     const settings = await storage.getSettings();
     const wishlist = await storage.getWishlist();
+    const stats = await storage.getStats();
 
     // Update DOM
     document.getElementById('total-saved').textContent = formatCurrency(totalSaved);
+    document.getElementById('streak-val').textContent = (stats.currentStreak || 0) + ' 🔥';
+    document.getElementById('points-val').textContent = (stats.totalPoints || 0) + ' 🪙';
+
+    renderAchievements(stats.achievements || []);
 
     const allowanceInput = document.getElementById('allowance');
     allowanceInput.value = settings.monthlyAllowance;
@@ -22,6 +27,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderWishlist(wishlist);
 });
+
+function renderAchievements(unlockedIds) {
+    const grid = document.getElementById('achievements-grid');
+    if (unlockedIds.length === 0) return;
+
+    grid.innerHTML = '';
+    const badgeMap = {
+        'first_save': { icon: '🌱', title: 'First Steps' },
+        'streak_3': { icon: '🔥', title: 'On Fire (3 Day Streak)' },
+        'streak_7': { icon: '🚀', title: 'Unstoppable (7 Day Streak)' },
+        'saver_100': { icon: '💰', title: 'Big Saver (100 Pts)' },
+        'saver_1000': { icon: '🏦', title: 'Vault Keeper (1000 Pts)' }
+    };
+
+    unlockedIds.forEach(id => {
+        if (badgeMap[id]) {
+            const span = document.createElement('span');
+            span.title = badgeMap[id].title;
+            span.textContent = badgeMap[id].icon;
+            span.style.fontSize = '18px';
+            span.style.cursor = 'help';
+            grid.appendChild(span);
+        }
+    });
+}
 
 function formatCurrency(amount) {
     return new Intl.NumberFormat('en-US', {

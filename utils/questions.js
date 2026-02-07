@@ -29,8 +29,7 @@ export const questions = [
     type: 'money',
     tier: 'medium',
     risk: 'medium',
-    inputType: 'scale', // Rate need 1-10
-    scaleLabel: 'Need Level (1=Low, 10=Critical)'
+    inputType: 'buttons'
   },
   {
     id: 'm1',

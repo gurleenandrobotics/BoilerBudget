@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
+
 <body class="popup-body">
   <div class="dashboard-header">
     <div class="logo">
@@ -18,8 +20,26 @@
   </div>
 
   <div class="stats-card">
+    <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
+      <div style="text-align: center;">
+        <div class="label" style="font-size: 10px;">Streak</div>
+        <div class="value" id="streak-val" style="font-size: 24px;">0 🔥</div>
+      </div>
+      <div style="text-align: center;">
+        <div class="label" style="font-size: 10px;">Points</div>
+        <div class="value" id="points-val" style="font-size: 24px;">0 🪙</div>
+      </div>
+    </div>
     <div class="label">Total Saved</div>
     <div class="value" id="total-saved">$0.00</div>
+
+    <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+      <div class="label" style="margin-bottom: 5px;">Achievements</div>
+      <div id="achievements-grid" style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;">
+        <!-- Badges injected here -->
+        <span style="font-size: 10px; color: #666;">No badges yet... save to earn!</span>
+      </div>
+    </div>
   </div>
 
   <div class="section">
@@ -32,7 +52,9 @@
   <div class="section">
     <div class="section-title">
       Skipped Items (Wishlist)
-      <span style="font-size: 10px; background: #e0e7ff; color: var(--bb-primary); padding: 2px 6px; border-radius: 10px;" id="wishlist-count">0</span>
+      <span
+        style="font-size: 10px; background: #e0e7ff; color: var(--bb-primary); padding: 2px 6px; border-radius: 10px;"
+        id="wishlist-count">0</span>
     </div>
     <div class="wishlist-container" id="wishlist-list">
       <!-- Items injected here -->
@@ -42,4 +64,5 @@
 
   <script src="popup.js" type="module"></script>
 </body>
+
 </html>
