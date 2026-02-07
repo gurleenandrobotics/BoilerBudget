@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BoilerBudget</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="popup-body">
+  <div class="dashboard-header">
+    <div class="logo">
+      <span>🛡️</span> BoilerBudget
+    </div>
+    <!-- Settings Gear could go here -->
+  </div>
+
+  <div class="stats-card">
+    <div class="label">Total Saved</div>
+    <div class="value" id="total-saved">$0.00</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Monthly Allowance</div>
+    <input type="number" id="allowance" class="allowance-input" placeholder="Enter amount (e.g. 200)" />
+  </div>
+
+  <br>
+
+  <div class="section">
+    <div class="section-title">
+      Skipped Items (Wishlist)
+      <span style="font-size: 10px; background: #e0e7ff; color: var(--bb-primary); padding: 2px 6px; border-radius: 10px;" id="wishlist-count">0</span>
+    </div>
+    <div class="wishlist-container" id="wishlist-list">
+      <!-- Items injected here -->
+      <div style="text-align: center; color: #9ca3af; padding: 20px;">No items skipped yet.</div>
+    </div>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
