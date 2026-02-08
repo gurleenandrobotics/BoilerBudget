@@ -26,6 +26,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     renderWishlist(wishlist);
+
+    // Handle TTS toggle button
+    chrome.storage.local.get(['ttsEnabled'], (result) => {
+        const ttsToggleBtn = document.getElementById('tts-toggle');
+        const ttsStatus = document.getElementById('tts-status');
+        const ttsEnabled = result.ttsEnabled || false;
+
+        updateTtsButton(ttsEnabled, ttsToggleBtn, ttsStatus);
+
+        if (ttsToggleBtn) {
+            ttsToggleBtn.addEventListener('click', async () => {
+                const newState = !ttsEnabled;
+                await chrome.storage.local.set({ ttsEnabled: newState });
+                updateTtsButton(newState, ttsToggleBtn, ttsStatus);
+                alert(newState ? '✅ TTS Enabled!' : '✅ TTS Disabled');
+            });
+        }
+    });
+
+    function updateTtsButton(isEnabled, button, statusEl) {
+        if (isEnabled) {
+            statusEl.textContent = 'Enabled';
+            statusEl.style.color = '#10b981';
+            button.textContent = '🔊 Disable TTS';
+        } else {
+            statusEl.textContent = 'Disabled';
+            statusEl.style.color = '#ef4444';
+            button.textContent = '🔇 Enable TTS';
+        }
+    }
 });
 
 function renderAchievements(unlockedIds) {

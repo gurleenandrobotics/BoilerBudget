@@ -29,6 +29,63 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true; // Keep channel open
     }
+    else if (request.type === 'GET_TTS') {
+        const text = request.text || '';
+        console.log('[BoilerBudget Background] TTS request for:', text.substring(0, 50));
+
+        (async () => {
+            try {
+                // Check if TTS is enabled
+                const storageData = await new Promise((resolve) => {
+                    chrome.storage.local.get(['ttsEnabled'], resolve);
+                });
+                
+                if (!storageData.ttsEnabled) {
+                    sendResponse({ ok: false, error: 'TTS disabled' });
+                    return;
+                }
+
+                // Call backend TTS endpoint
+                const response = await fetch('http://127.0.0.1:8000/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                if (!response.ok) {
+                    console.warn('[BoilerBudget Background] Backend TTS error:', response.status);
+                    sendResponse({ ok: false, error: 'Failed to generate audio' });
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.audio) {
+                    sendResponse({ ok: true, audioUrl: data.audio });
+                } else {
+                    sendResponse({ ok: false, error: 'No audio data returned' });
+                }
+            } catch (err) {
+                console.error('[BoilerBudget Background] TTS error:', err);
+                sendResponse({ ok: false, error: String(err) });
+            }
+        })();
+
+        return true; // keep message channel open for async response
+    }
+    else if (request.type === 'ADD_TO_WISHLIST') {
+        const item = request.item;
+        console.log('[BoilerBudget Background] ADD_TO_WISHLIST request:', item);
+
+        storage.addToWishlist(item).then(() => {
+            console.log('[BoilerBudget Background] Item added to wishlist');
+            sendResponse({ ok: true });
+        }).catch((err) => {
+            console.error('[BoilerBudget Background] Wishlist add error:', err);
+            sendResponse({ ok: false, error: String(err) });
+        });
+
+        return true; // keep message channel open for async response
+    }
     // Keep the channel open for async response
     return true;
 });

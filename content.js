@@ -1,6 +1,18 @@
 // Pattern to detect checkout or cart URLs
 const CHECKOUT_REGEX = /checkout|cart|basket|buy/i;
 
+// ============================================================
+// GLOBAL VARIABLES - Declare all before use
+// ============================================================
+let questions = [];
+let questionIndex = 0;
+let score = 0;
+let shadow = null; // Shadow root reference
+window.bbCurrentPrice = 0; // Global tracker
+let audioEnabled = true; // Toggle TTS on/off
+let currentAudio = null; // HTMLAudioElement for playback
+let currentItemInfo = {}; // Store current item info for wishlist
+
 // Heuristic to find price on the page
 function findPrice() {
     // Look for common price patterns like $12.34
@@ -43,19 +55,47 @@ if (shouldIntervene()) {
 // INTERVENTION UI
 // ----------------------------------------------------------------------
 
-let questions = [];
-let questionIndex = 0;
-let score = 0;
-let shadow = null; // Shadow root reference
-window.bbCurrentPrice = 0; // Global tracker
-
 function startIntervention(price) {
     window.bbCurrentPrice = price;
+    
+    // Capture item information for wishlist
+    currentItemInfo = {
+        title: document.title.split('|')[0].trim(),
+        price: price,
+        url: window.location.href,
+        date: new Date().toISOString()
+    };
+    
     // 1. Get Questions from background
     chrome.runtime.sendMessage({ type: 'GET_QUESTIONS', price }, (response) => {
         questions = response.questions;
         if (questions && questions.length > 0) {
             showOverlay(price);
+        }
+    });
+}
+
+/**
+ * Request TTS audio from background and play it
+ */
+function playQuestionAudio(questionText) {
+    if (!audioEnabled) {
+        return;
+    }
+
+    chrome.runtime.sendMessage({ type: 'GET_TTS', text: questionText }, (response) => {
+        if (response && response.ok && response.audioUrl) {
+            // Stop any currently playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+
+            // Create and play new audio
+            currentAudio = new Audio(response.audioUrl);
+            currentAudio.play().catch((err) => {
+                console.error('[BoilerBudget] Audio playback error:', err);
+            });
         }
     });
 }
@@ -144,7 +184,10 @@ function renderQuestion(price, container) {
     container.innerHTML = `
     <div class="bb-card">
       <div class="bb-header">
-         <h2>Pause for a Moment</h2>
+         <div style="display: flex; justify-content: space-between; align-items: center;">
+           <h2>Pause for a Moment</h2>
+           <button id="bb-speaker" class="bb-speaker-btn" title="Toggle audio">🔊</button>
+         </div>
          <p>Let's think about this purchase.</p>
       </div>
       <div class="bb-progress">
@@ -157,29 +200,47 @@ function renderQuestion(price, container) {
     </div>
   `;
 
+    // Play audio if enabled
+    const questionText = questions[questionIndex].text.replace('{price}', '$' + (price || 0).toFixed(2));
+    playQuestionAudio(questionText);
+
+    // Attach speaker button listener
+    const speakerBtn = shadow.querySelector('#bb-speaker');
+    if (speakerBtn) {
+        speakerBtn.onclick = (e) => {
+            e.stopPropagation();
+            audioEnabled = !audioEnabled;
+            speakerBtn.textContent = audioEnabled ? '🔊' : '🔇';
+            speakerBtn.style.opacity = audioEnabled ? '1' : '0.5';
+            if (audioEnabled) {
+                playQuestionAudio(questionText);
+            }
+        };
+    }
+
     // Attach listeners
     if (!q.inputType || q.inputType === 'buttons') {
-        const btnYes = shadow.getElementById('btn-yes');
-        const btnMeh = shadow.getElementById('btn-meh');
-        const btnNo = shadow.getElementById('btn-no');
+        const btnYes = shadow.querySelector('#btn-yes');
+        const btnMeh = shadow.querySelector('#btn-meh');
+        const btnNo = shadow.querySelector('#btn-no');
 
         if (btnYes) btnYes.onclick = () => answer(1);
         if (btnMeh) btnMeh.onclick = () => answer(0);
         if (btnNo) btnNo.onclick = () => answer(-1);
     } else {
         // Handle Next Button for inputs
-        const nextBtn = shadow.getElementById('btn-next');
+        const nextBtn = shadow.querySelector('#btn-next');
 
         if (q.inputType === 'scale') {
-            const range = shadow.getElementById('bb-input-scale');
-            const disp = shadow.getElementById('bb-scale-val');
+            const range = shadow.querySelector('#bb-input-scale');
+            const disp = shadow.querySelector('#bb-scale-val');
             if (range && disp) {
                 range.oninput = (e) => disp.textContent = e.target.value;
             }
             if (nextBtn) nextBtn.onclick = () => answer(parseInt(range.value));
         }
         else if (q.inputType === 'number') {
-            const input = shadow.getElementById('bb-input-number');
+            const input = shadow.querySelector('#bb-input-number');
             if (nextBtn) nextBtn.onclick = () => {
                 const val = parseFloat(input.value);
                 if (isNaN(val)) return; // Validate
@@ -187,7 +248,7 @@ function renderQuestion(price, container) {
             };
         }
         else if (q.inputType === 'text') {
-            const input = shadow.getElementById('bb-input-text');
+            const input = shadow.querySelector('#bb-input-text');
             if (nextBtn) nextBtn.onclick = () => {
                 if (input.value.trim().length === 0) return;
                 answer(input.value);
@@ -273,42 +334,39 @@ function renderResult(container) {
     </div>
   `;
 
-    shadow.getElementById('btn-save').onclick = async () => {
-        // Save logic
-        // We don't have the item price easily available here unless tracked globally.
-        // However, we rely on the implementation of `storage.addSavings`.
-        // We need to pass the price or retrieve it. 
-        // `renderQuestion` was called with `price`, but we are deep in `renderResult`.
-        // Let's rely on a global `currentPrice` variable or similar approach?
-        // Actually, `renderQuestion` received `price`, but we didn't persist it. 
-        // Let's assume for now we grab it from the DOM text if needed, OR better:
-        // We pass `price` through the `renderResult` chain.
+    shadow.querySelector('#btn-save').onclick = async () => {
+        const savedAmount = window.bbCurrentPrice || 0;
 
-        // For now, let's use a heuristic: if `price` variable is available in scope (it is not directly here).
-        // Let's fix this by adding `currentPrice` global.
-        const savedAmount = window.bbCurrentPrice || 0; // Fallback
+        // Stop audio playback
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio = null;
+        }
 
-        // Call background to add savings (which now handles points/streaks)
-        // We need to convert `addSavings` to message passing because content script 
-        // cannot access `storage.js` directly if it's an ES module that uses `chrome.storage`?
-        // Actually `storage.js` uses `chrome.storage.local` which IS available in content scripts.
-        // BUT we imported `getQuestionsForPrice` in background, not `storage` methods?
-        // Wait, we need to import `storage` in content.js? 
-        // Or send message to background to handle the write.
-        // Messaging is safer for logic centralization.
+        // Log item to wishlist
+        if (currentItemInfo && currentItemInfo.title && currentItemInfo.price > 0) {
+            chrome.runtime.sendMessage({ type: 'ADD_TO_WISHLIST', item: currentItemInfo }, (response) => {
+                if (response && response.ok) {
+                    console.log('[BoilerBudget] Item logged');
+                }
+            });
+        }
 
         chrome.runtime.sendMessage({ type: 'ADD_SAVINGS', amount: savedAmount }, (response) => {
             if (response) {
-                // Show Feedback
                 const { pointsEarned, newStreak, unlocked } = response;
                 alert(`🎉 SAVED! \n\n+${pointsEarned} Points 🪙\nStreak: ${newStreak} 🔥`);
-                // Removing host
                 document.getElementById('boiler-budget-host').remove();
             }
         });
     };
 
-    shadow.getElementById('btn-buy').onclick = () => {
+    shadow.querySelector('#btn-buy').onclick = () => {
+        // Stop audio playback
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio = null;
+        }
         document.getElementById('boiler-budget-host').remove();
     };
 }
