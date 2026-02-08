@@ -1,5 +1,5 @@
 import { getQuestionsForPrice } from './utils/questions.js';
-import { storage } from './utils/storage.js';
+import { budgetStorage } from './utils/budget_storage.js';
 
 chrome.runtime.onInstalled.addListener(() => {
     console.log('BoilerBudget installed.');
@@ -16,16 +16,25 @@ chrome.runtime.onInstalled.addListener(() => {
     });
 });
 
-
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('BoilerBudget: Background received message:', request.type, request);
+
     if (request.type === 'GET_QUESTIONS') {
-        const questions = getQuestionsForPrice(request.price);
-        sendResponse({ questions });
+        try {
+            const questions = getQuestionsForPrice(request.price);
+            console.log('BoilerBudget: Sending questions:', questions.length);
+            sendResponse({ questions });
+        } catch (err) {
+            console.error('BoilerBudget: Error in GET_QUESTIONS:', err);
+            sendResponse({ questions: [] });
+        }
     }
     else if (request.type === 'ADD_SAVINGS') {
-        storage.addSavings(request.amount).then((result) => {
+        budgetStorage.addSavings(request.amount).then((result) => {
+            console.log('BoilerBudget: Savings added result:', result);
             sendResponse(result);
+        }).catch(err => {
+            console.error('BoilerBudget: Error in ADD_SAVINGS:', err);
         });
         return true; // Keep channel open
     }

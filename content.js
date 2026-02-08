@@ -29,14 +29,19 @@ function shouldIntervene() {
 // MAIN LOGIC
 // ----------------------------------------------------------------------
 
+console.log('BoilerBudget: Logic loaded. Checking URL:', window.location.href);
+
 if (shouldIntervene()) {
+    console.log('BoilerBudget: URL match found. Looking for price...');
     const price = findPrice();
     if (price > 0) {
-        // Check if we already intervened continuously? 
-        // For demo, just run it.
         console.log('BoilerBudget: Intervening! Price detected:', price);
         startIntervention(price);
+    } else {
+        console.log('BoilerBudget: No price detected. Skipping intervention.');
     }
+} else {
+    console.log('BoilerBudget: URL does not match intervention criteria.');
 }
 
 // ----------------------------------------------------------------------
@@ -51,11 +56,19 @@ window.bbCurrentPrice = 0; // Global tracker
 
 function startIntervention(price) {
     window.bbCurrentPrice = price;
+    console.log('BoilerBudget: Sending GET_QUESTIONS message to background...');
     // 1. Get Questions from background
     chrome.runtime.sendMessage({ type: 'GET_QUESTIONS', price }, (response) => {
-        questions = response.questions;
+        if (chrome.runtime.lastError) {
+            console.error('BoilerBudget: Message error:', chrome.runtime.lastError.message);
+            return;
+        }
+        console.log('BoilerBudget: Received response from background:', response);
+        questions = response ? response.questions : [];
         if (questions && questions.length > 0) {
             showOverlay(price);
+        } else {
+            console.warn('BoilerBudget: No questions returned for price:', price);
         }
     });
 }
@@ -115,7 +128,7 @@ function renderQuestion(price, container) {
     else if (q.inputType === 'number') {
         inputHtml = `
       <div style="margin-top: 15px; display: flex; flex-direction: column; align-items: center; gap: 15px;">
-         <input type="number" id="bb-input-number" class="allowance-input" placeholder="${q.unit || 'Enter amount'}" style="text-align: center; width: 150px; color: #fff; background: rgba(255,255,255,0.1); border: 1px solid rgba(212,175,55,0.3);">
+         <input type="number" id="bb-input-number" class="allowance-input" placeholder="${q.unit || 'Enter amount'}" style="text-align: center; width: 150px;">
          <button id="btn-next" class="bb-btn bb-btn-primary">Next</button>
       </div>`;
     }
@@ -123,7 +136,7 @@ function renderQuestion(price, container) {
     else if (q.inputType === 'text') {
         inputHtml = `
       <div style="margin-top: 15px; display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%;">
-         <textarea id="bb-input-text" class="allowance-input" rows="3" placeholder="${q.placeholder || 'Type here...'}" style="width: 100%; resize: none; color: #fff; background: rgba(255,255,255,0.1); border: 1px solid rgba(212,175,55,0.3);"></textarea>
+         <textarea id="bb-input-text" class="allowance-input" rows="3" placeholder="${q.placeholder || 'Type here...'}" style="width: 100%; resize: none;"></textarea>
          <button id="btn-next" class="bb-btn bb-btn-primary">Next</button>
       </div>`;
     }
@@ -240,7 +253,7 @@ function answer(val) {
 function renderResult(container) {
     let decision = 'WAIT';
     let message = 'You should probably wait 24 hours.';
-    let color = '#D4AF37'; // Gold
+    let color = '#FF1493'; // Deep Pink (Dark Pink variant)
 
     if (score >= 3) {
         decision = 'BUY';
@@ -259,16 +272,22 @@ function renderResult(container) {
       </div>
       
       <div style="margin: 20px 0;">
-        <div style="font-size: 14px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">Recommendation</div>
+        <div style="font-size: 14px; color: var(--bb-text-muted); text-transform: uppercase; letter-spacing: 1px;">Recommendation</div>
         <div style="font-size: 48px; font-weight: 800; color: ${color}; margin: 10px 0; text-shadow: 0 0 20px ${color}40;">
           ${decision}
         </div>
-        <p style="font-size: 16px; color: #fff;">${message}</p>
+        <p style="font-size: 16px; color: var(--bb-text-main);">${message}</p>
       </div>
 
       <div class="bb-actions">
          <button id="btn-save" class="bb-btn bb-btn-primary">Save $ (Skip)</button>
          <button id="btn-buy" class="bb-btn bb-btn-secondary">Buy Anyway</button>
+      </div>
+
+      <div style="margin-top: 20px; border-top: 1px solid rgba(255, 182, 193, 0.3); padding-top: 20px; text-align: center;">
+         <a href="http://10.186.26.72:3000/" target="_blank" class="bb-btn bb-btn-primary" style="text-decoration: none; display: inline-block; width: auto; font-size: 13px; padding: 10px 15px; background: #FFB6C1; color: #fff; border-radius: 8px; font-weight: bold;">
+            Girl, run your own business: here is a simulator-
+         </a>
       </div>
     </div>
   `;
