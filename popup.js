@@ -1,4 +1,4 @@
-import { storage } from './utils/storage.js';
+import { budgetStorage as storage } from './utils/budget_storage.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Load initial data

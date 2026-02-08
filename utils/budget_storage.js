@@ -1,4 +1,4 @@
-export const storage = {
+export const budgetStorage = {
     get: (keys) => {
         return new Promise((resolve) => {
             chrome.storage.local.get(keys, (result) => {
@@ -19,30 +19,30 @@ export const storage = {
             monthlyAllowance: 200, // Default $200
             currency: '$'
         };
-        const saved = await storage.get(['settings']);
+        const saved = await budgetStorage.get(['settings']);
         return { ...defaultSettings, ...saved.settings };
     },
     saveSettings: async (settings) => {
-        await storage.set({ settings });
+        await budgetStorage.set({ settings });
     },
     addToWishlist: async (item) => {
         // limit wishlist size?
-        const data = await storage.get(['wishlist']);
+        const data = await budgetStorage.get(['wishlist']);
         const list = data.wishlist || [];
         list.push({ ...item, date: new Date().toISOString() });
-        await storage.set({ wishlist: list });
+        await budgetStorage.set({ wishlist: list });
     },
     getWishlist: async () => {
-        const data = await storage.get(['wishlist']);
+        const data = await budgetStorage.get(['wishlist']);
         return data.wishlist || [];
     },
     addSavings: async (amount) => {
-        const data = await storage.get(['totalSaved']);
+        const data = await budgetStorage.get(['totalSaved']);
         const current = data.totalSaved || 0;
-        await storage.set({ totalSaved: current + amount });
+        await budgetStorage.set({ totalSaved: current + amount });
 
         // Update Stats & Gamification
-        const stats = await storage.getStats();
+        const stats = await budgetStorage.getStats();
         stats.itemsSaved = (stats.itemsSaved || 0) + 1;
 
         // Calculate Points: 10 base + 1 per dollar
@@ -71,18 +71,18 @@ export const storage = {
         stats.lastSaveDate = now.toISOString();
 
         // Check Achievements
-        const unlocked = await storage.checkAchievements(stats);
+        const unlocked = await budgetStorage.checkAchievements(stats);
 
-        await storage.set({ stats });
+        await budgetStorage.set({ stats });
 
         return { pointsEarned, newStreak: stats.currentStreak, unlocked };
     },
     getTotalSaved: async () => {
-        const data = await storage.get(['totalSaved']);
+        const data = await budgetStorage.get(['totalSaved']);
         return data.totalSaved || 0;
     },
     getStats: async () => {
-        const data = await storage.get(['stats']);
+        const data = await budgetStorage.get(['stats']);
         return data.stats || { currentStreak: 0, totalPoints: 0, itemsSaved: 0, lastSaveDate: null, achievements: [] };
     },
     checkAchievements: async (stats) => {
