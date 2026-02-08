@@ -49,11 +49,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     chrome.storage.local.get(['ttsEnabled'], resolve);
                 });
                 
+                console.log('[BoilerBudget Background] TTS enabled:', storageData.ttsEnabled);
+                
                 if (!storageData.ttsEnabled) {
+                    console.warn('[BoilerBudget Background] TTS is disabled');
                     sendResponse({ ok: false, error: 'TTS disabled' });
                     return;
                 }
 
+                console.log('[BoilerBudget Background] Calling backend TTS endpoint...');
                 // Call backend TTS endpoint
                 const response = await fetch('http://127.0.0.1:8000/tts', {
                     method: 'POST',
@@ -61,21 +65,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     body: JSON.stringify({ text })
                 });
 
+                console.log('[BoilerBudget Background] Backend response status:', response.status);
+
                 if (!response.ok) {
-                    console.warn('[BoilerBudget Background] Backend TTS error:', response.status);
+                    const errorText = await response.text();
+                    console.warn('[BoilerBudget Background] Backend TTS error:', response.status, errorText);
                     sendResponse({ ok: false, error: 'Failed to generate audio' });
                     return;
                 }
 
                 const data = await response.json();
+                console.log('[BoilerBudget Background] Backend returned data with audio:', !!data.audio);
+                
                 if (data.audio) {
+                    console.log('[BoilerBudget Background] Sending audioUrl to content script');
                     sendResponse({ ok: true, audioUrl: data.audio });
                 } else {
+                    console.warn('[BoilerBudget Background] No audio data in response');
                     sendResponse({ ok: false, error: 'No audio data returned' });
                 }
             } catch (err) {
-                console.error('[BoilerBudget Background] TTS error:', err);
-                sendResponse({ ok: false, error: String(err) });
+                console.error('[BoilerBudget Background] TTS error:', err.message, err);
+                sendResponse({ ok: false, error: String(err.message) });
             }
         })();
 
@@ -85,7 +96,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const item = request.item;
         console.log('[BoilerBudget Background] ADD_TO_WISHLIST request:', item);
 
-        storage.addToWishlist(item).then(() => {
+        budgetStorage.addToWishlist(item).then(() => {
             console.log('[BoilerBudget Background] Item added to wishlist');
             sendResponse({ ok: true });
         }).catch((err) => {

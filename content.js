@@ -88,6 +88,89 @@ function startIntervention(price) {
     });
 }
 
+/**
+ * Request TTS audio from background and play it
+ */
+function playQuestionAudio(questionText) {
+    console.log('[BoilerBudget Content] playQuestionAudio called. audioEnabled:', audioEnabled);
+    
+    if (!audioEnabled) {
+        console.log('[BoilerBudget Content] Audio disabled, skipping TTS');
+        return;
+    }
+
+    console.log('[BoilerBudget Content] Requesting TTS for:', questionText.substring(0, 50));
+    chrome.runtime.sendMessage({ type: 'GET_TTS', text: questionText }, (response) => {
+        if (chrome.runtime.lastError) {
+            console.error('[BoilerBudget Content] Message error:', chrome.runtime.lastError.message);
+            return;
+        }
+        
+        console.log('[BoilerBudget Content] TTS response received:', response);
+        
+        if (response && response.ok && response.audioUrl) {
+            console.log('[BoilerBudget Content] Audio URL received, attempting playback');
+            
+            try {
+                // Stop any currently playing audio
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
+                }
+
+                // Convert data URL to Blob and create object URL
+                const audioData = response.audioUrl;
+                let audioBlob;
+                
+                if (audioData.startsWith('data:')) {
+                    // Parse data URL
+                    const parts = audioData.split(',');
+                    const mimeString = parts[0].match(/:(.*?);/)[1];
+                    const bstr = atob(parts[1]);
+                    const n = bstr.length;
+                    const u8arr = new Uint8Array(n);
+                    for (let i = 0; i < n; i++) {
+                        u8arr[i] = bstr.charCodeAt(i);
+                    }
+                    audioBlob = new Blob([u8arr], { type: mimeString });
+                } else {
+                    console.error('[BoilerBudget Content] Unexpected audio URL format');
+                    return;
+                }
+
+                const blobUrl = URL.createObjectURL(audioBlob);
+                console.log('[BoilerBudget Content] Created blob URL for audio');
+                
+                // Create and play new audio
+                currentAudio = new Audio();
+                currentAudio.src = blobUrl;
+                currentAudio.onplay = () => console.log('[BoilerBudget Content] Audio playing');
+                currentAudio.onerror = (e) => {
+                    console.error('[BoilerBudget Content] Audio error event:', e);
+                    console.error('[BoilerBudget Content] Audio error details:', currentAudio.error);
+                };
+                currentAudio.onended = () => {
+                    console.log('[BoilerBudget Content] Audio ended');
+                    URL.revokeObjectURL(blobUrl);
+                };
+                
+                const playPromise = currentAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => console.log('[BoilerBudget Content] Audio playback started'))
+                        .catch((err) => {
+                            console.error('[BoilerBudget Content] Audio play promise rejected:', err.name, err.message);
+                        });
+                }
+            } catch (err) {
+                console.error('[BoilerBudget Content] Exception in playQuestionAudio:', err);
+            }
+        } else {
+            console.warn('[BoilerBudget Content] TTS failed:', response?.error || 'Unknown error', 'Response:', response);
+        }
+    });
+}
+
 function showOverlay(price) {
     const host = document.createElement('div');
     host.id = 'boiler-budget-host';
@@ -118,6 +201,11 @@ function showOverlay(price) {
 function renderQuestion(price, container) {
     if (!container) {
         container = shadow.querySelector('.bb-overlay');
+    }
+    
+    // Use global price if not provided
+    if (!price) {
+        price = window.bbCurrentPrice || 0;
     }
 
     // End of questions? Show Result
